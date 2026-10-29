@@ -4,7 +4,7 @@ import by.assxmblxr.authservice.entity.Credentials;
 import by.assxmblxr.authservice.exception.InvalidTokenException;
 import by.assxmblxr.authservice.service.TokenService;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.oauth2.jwt.*;
 import org.springframework.stereotype.Service;
 
@@ -32,7 +32,7 @@ public class TokenServiceImpl implements TokenService {
   public String generateAccessToken(Credentials credentials) {
     Instant now = Instant.now();
     JwtClaimsSet claims = JwtClaimsSet.builder()
-            .subject(credentials.getLogin())
+            .subject(credentials.getUsername())
             .issuedAt(now)
             .expiresAt(now.plus(accessTtl))
             .claim("userId", credentials.getUserId())
@@ -40,7 +40,7 @@ public class TokenServiceImpl implements TokenService {
             .claim("type", "access")
             .build();
 
-    JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
+    JwsHeader header = JwsHeader.with(SignatureAlgorithm.RS256).build();
 
     return jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
   }
@@ -49,14 +49,14 @@ public class TokenServiceImpl implements TokenService {
   public String generateRefreshToken(Credentials credentials) {
     Instant now = Instant.now();
     JwtClaimsSet claims = JwtClaimsSet.builder()
-            .subject(credentials.getLogin())
+            .subject(credentials.getUsername())
             .issuedAt(now)
             .expiresAt(now.plus(refreshTtl))
             .claim("userId", credentials.getUserId())
             .claim("type", "refresh")
             .build();
 
-    JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
+    JwsHeader header = JwsHeader.with(SignatureAlgorithm.RS256).build();
 
     return jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
   }
