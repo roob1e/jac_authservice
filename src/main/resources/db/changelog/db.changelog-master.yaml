@@ -2,3 +2,6 @@ databaseChangeLog:
   - include:
       file: changes/001-create-credentials-table.yaml
       relativeToChangelogFile: true
+  - include:
+      file: changes/002-rename-login-and-add-audit-columns.yaml
+      relativeToChangelogFile: true

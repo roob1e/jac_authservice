@@ -2,6 +2,11 @@ package by.assxmblxr.authservice.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+import java.time.Instant;
 
 @Getter
 @Setter
@@ -10,6 +15,7 @@ import lombok.*;
 @Builder
 @Entity
 @Table(name = "credentials")
+@EntityListeners(AuditingEntityListener.class)
 public class Credentials {
 
   @Id
@@ -19,8 +25,8 @@ public class Credentials {
   @Column(name = "user_id", nullable = false)
   private Long userId;
 
-  @Column(name = "login", nullable = false)
-  private String login;
+  @Column(name = "username", nullable = false)
+  private String username;
 
   @Column(name = "password_hash", nullable = false)
   private String passwordHash;
@@ -32,4 +38,12 @@ public class Credentials {
   @Builder.Default
   @Column(name = "active", nullable = false)
   private boolean active = true;
+
+  @CreatedDate
+  @Column(name = "created_at", nullable = false, updatable = false)
+  private Instant createdAt;
+
+  @LastModifiedDate
+  @Column(name = "updated_at", nullable = false)
+  private Instant updatedAt;
 }

@@ -5,7 +5,7 @@ import by.assxmblxr.authservice.entity.Role;
 public record RegisterResponse(
         Long id,
         Long userId,
-        String login,
+        String username,
         Role role
 ) {
 }

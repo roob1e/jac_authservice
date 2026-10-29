@@ -9,9 +9,9 @@ import lombok.Builder;
 @Builder
 public record RegisterRequest(
         @NotBlank
-        @Size(min = 5, max = 100, message = "Login must be 5-100 characters long")
-        @Pattern(regexp = "^[a-zA-Z0-9_]+$", message = "Login may contain only Latin letters, digits and \"_\"")
-        String login,
+        @Size(min = 5, max = 100, message = "Username must be 5-100 characters long")
+        @Pattern(regexp = "^[a-zA-Z0-9_]+$", message = "Username may contain only Latin letters, digits and \"_\"")
+        String username,
 
         @NotBlank
         @Email
