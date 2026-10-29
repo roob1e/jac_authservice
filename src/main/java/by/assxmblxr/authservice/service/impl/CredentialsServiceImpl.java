@@ -7,8 +7,10 @@ import by.assxmblxr.authservice.entity.Role;
 import by.assxmblxr.authservice.exception.AccountDisabledException;
 import by.assxmblxr.authservice.exception.InvalidCredentialsException;
 import by.assxmblxr.authservice.exception.InvalidTokenException;
-import by.assxmblxr.authservice.exception.LoginAlreadyExistsException;
+import by.assxmblxr.authservice.exception.UsernameAlreadyExistsException;
+import by.assxmblxr.authservice.mapper.CredentialsMapper;
 import by.assxmblxr.authservice.repository.CredentialsRepository;
+import by.assxmblxr.authservice.service.CredentialsPersistenceService;
 import by.assxmblxr.authservice.service.CredentialsService;
 import by.assxmblxr.authservice.service.TokenService;
 import lombok.RequiredArgsConstructor;
@@ -23,23 +25,22 @@ public class CredentialsServiceImpl implements CredentialsService {
   private final UserServiceClient userServiceClient;
   private final PasswordEncoder passwordEncoder;
   private final TokenService tokenService;
+  private final CredentialsPersistenceService credentialsPersistenceService;
+  private final CredentialsMapper credentialsMapper;
 
   @Override
   public RegisterResponse register(RegisterRequest request) {
-    if (credentialsRepository.existsByLogin(request.login())) {
-      throw new LoginAlreadyExistsException("Login \"" + request.login() + "\" already exists");
+    if (credentialsRepository.existsByUsername(request.username())) {
+      throw new UsernameAlreadyExistsException("Username \"" + request.username() + "\" already exists");
     }
     Long userId = userServiceClient.createUser(request.firstName(), request.lastName(), request.email());
-    String passwordHash = passwordEncoder.encode(request.password());
-    Credentials credentials = Credentials.builder()
-            .userId(userId)
-            .login(request.login())
-            .passwordHash(passwordHash)
-            .role(Role.USER)
-            .build();
+    Credentials credentials = credentialsMapper.toEntity(request);
+    credentials.setUserId(userId);
+    credentials.setPasswordHash(passwordEncoder.encode(request.password()));
+    credentials.setRole(Role.USER);
 
     try {
-      credentials = credentialsRepository.save(credentials);
+      credentials = credentialsPersistenceService.save(credentials);
     } catch (RuntimeException e) {
       try {
         userServiceClient.deleteUser(userId);
@@ -48,20 +49,15 @@ public class CredentialsServiceImpl implements CredentialsService {
       }
       throw e;
     }
-    return new RegisterResponse(
-            credentials.getId(),
-            userId,
-            credentials.getLogin(),
-            credentials.getRole()
-    );
+    return credentialsMapper.toRegisterResponse(credentials);
   }
 
   @Override
   public TokenResponse login(LoginRequest request) {
-    Credentials credentials = credentialsRepository.findByLogin(request.login())
-            .orElseThrow(() -> new InvalidCredentialsException("Invalid login or password"));
+    Credentials credentials = credentialsRepository.findByUsername(request.username())
+            .orElseThrow(() -> new InvalidCredentialsException("Invalid username or password"));
     if (!passwordEncoder.matches(request.password(), credentials.getPasswordHash())) {
-      throw new InvalidCredentialsException("Invalid login or password");
+      throw new InvalidCredentialsException("Invalid username or password");
     }
     if (!credentials.isActive()) {
       throw new AccountDisabledException("Account disabled");
@@ -74,7 +70,7 @@ public class CredentialsServiceImpl implements CredentialsService {
   @Override
   public TokenResponse refresh(RefreshRequest request) {
     Jwt token = tokenService.parse(request.refreshToken(), "refresh");
-    Credentials credentials = credentialsRepository.findByLogin(token.getSubject())
+    Credentials credentials = credentialsRepository.findByUsername(token.getSubject())
             .orElseThrow(() -> new InvalidTokenException("Invalid token"));
 
     if (!credentials.isActive()) {
@@ -90,8 +86,8 @@ public class CredentialsServiceImpl implements CredentialsService {
   public ValidateResponse validate(ValidateRequest request) {
     Jwt token = tokenService.parse(request.accessToken(), "access");
     Long userId = token.getClaim("userId");
-    String login = token.getSubject();
+    String username = token.getSubject();
     String role = token.getClaim("role");
-    return new ValidateResponse(userId, login, role);
+    return new ValidateResponse(userId, username, role);
   }
 }
