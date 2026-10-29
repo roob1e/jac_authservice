@@ -11,5 +11,5 @@ WORKDIR /app
 RUN groupadd --system app && useradd --system --gid app app
 COPY --from=build /build/target/*.jar app.jar
 USER app
-EXPOSE 8080
+EXPOSE 8082
 ENTRYPOINT ["java", "-jar", "app.jar"]

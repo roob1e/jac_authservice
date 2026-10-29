@@ -18,9 +18,11 @@ services:
     ports: ["8082:8082"]
     environment:
       - 'SPRING_PROFILES_ACTIVE=docker'
-      - 'POSTGRES_USER=user'
-      - 'POSTGRES_PASSWORD=secret'
-      - 'JWT_SECRET=${JWT_SECRET}'
+      - 'DB_URL=jdbc:postgresql://postgres:5432/authservicedb'
+      - 'DB_USER=user'
+      - 'DB_PASSWORD=secret'
+      - 'USER_SERVICE_URL=http://user-service:8081'
+
     depends_on:
       postgres:
         condition: service_healthy
