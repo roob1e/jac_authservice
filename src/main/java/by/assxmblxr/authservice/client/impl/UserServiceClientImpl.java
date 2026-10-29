@@ -5,21 +5,22 @@ import by.assxmblxr.authservice.client.dto.CreateUserResponse;
 import by.assxmblxr.authservice.client.UserServiceClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestClient;
+import org.springframework.web.reactive.function.client.WebClient;
 
 @Component
 @RequiredArgsConstructor
 public class UserServiceClientImpl implements UserServiceClient {
-  private final RestClient restClient;
+  private final WebClient userServiceWebClient;
 
   @Override
   public Long createUser(String firstName, String lastName, String email) {
-    CreateUserResponse response = restClient
+    CreateUserResponse response = userServiceWebClient
             .post()
-            .uri("/users")
-            .body(new CreateUserRequest(firstName, lastName, email))
+            .uri("/api/users")
+            .bodyValue(new CreateUserRequest(firstName, lastName, email))
             .retrieve()
-            .body(CreateUserResponse.class);
+            .bodyToMono(CreateUserResponse.class)
+            .block();
     if (response == null || response.id() == null) {
       throw new IllegalStateException("UserService returned no user id");
     }
@@ -28,9 +29,11 @@ public class UserServiceClientImpl implements UserServiceClient {
 
   @Override
   public void deleteUser(Long id) {
-    restClient.delete()
-            .uri("/users/{id}", id)
+    userServiceWebClient
+            .delete()
+            .uri("/api/users/{id}", id)
             .retrieve()
-            .toBodilessEntity();
+            .toBodilessEntity()
+            .block();
   }
 }

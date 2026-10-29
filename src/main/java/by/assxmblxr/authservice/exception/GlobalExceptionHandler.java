@@ -7,12 +7,15 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestClientResponseException;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import java.time.Instant;
 import java.util.stream.Collectors;
@@ -20,9 +23,9 @@ import java.util.stream.Collectors;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
-  @ExceptionHandler(LoginAlreadyExistsException.class)
-  public ResponseEntity<ApiError> handleLoginAlreadyExistsException(
-          LoginAlreadyExistsException e, HttpServletRequest request
+  @ExceptionHandler(UsernameAlreadyExistsException.class)
+  public ResponseEntity<ApiError> handleUsernameAlreadyExistsException(
+          UsernameAlreadyExistsException e, HttpServletRequest request
   ) {
     return buildResponse(HttpStatus.CONFLICT, e.getMessage(), request);
   }
@@ -48,13 +51,13 @@ public class GlobalExceptionHandler {
   public ResponseEntity<ApiError> handleDataIntegrityViolationException(
           DataIntegrityViolationException e, HttpServletRequest request
   ) {
-    log.warn("Data integrity violation on {}", request.getRequestURI(), e);
+    log.warn("Data integrity violation on {}: {}", request.getRequestURI(), e.getMostSpecificCause().getMessage());
     return buildResponse(HttpStatus.CONFLICT, "Data integrity violation", request);
   }
 
-  @ExceptionHandler(RestClientResponseException.class)
-  public ResponseEntity<ApiError> handleRestClientResponseException(
-          RestClientResponseException e, HttpServletRequest request
+  @ExceptionHandler(WebClientResponseException.class)
+  public ResponseEntity<ApiError> handleWebClientResponseException(
+          WebClientResponseException e, HttpServletRequest request
   ) {
     HttpStatus status = HttpStatus.resolve(e.getStatusCode().value());
     if (status == null || !status.is4xxClientError()) {
@@ -64,8 +67,10 @@ public class GlobalExceptionHandler {
     return buildResponse(status, userServiceMessage(e), request);
   }
 
-  @ExceptionHandler(RestClientException.class)
-  public ResponseEntity<ApiError> handleRestClientException(RestClientException e, HttpServletRequest request) {
+  @ExceptionHandler(WebClientRequestException.class)
+  public ResponseEntity<ApiError> handleWebClientRequestException(
+          WebClientRequestException e, HttpServletRequest request
+  ) {
     log.error("User service is unavailable on {}", request.getRequestURI(), e);
     return buildResponse(HttpStatus.SERVICE_UNAVAILABLE, "User service is unavailable", request);
   }
@@ -85,6 +90,21 @@ public class GlobalExceptionHandler {
     return buildResponse(HttpStatus.UNAUTHORIZED, e.getMessage(), request);
   }
 
+  @ExceptionHandler(JwtException.class)
+  public ResponseEntity<ApiError> handleJwtException(JwtException e, HttpServletRequest request) {
+    return buildResponse(HttpStatus.UNAUTHORIZED, "Invalid token", request);
+  }
+
+  @ExceptionHandler(AuthenticationException.class)
+  public ResponseEntity<ApiError> handleAuthenticationException(AuthenticationException e, HttpServletRequest request) {
+    return buildResponse(HttpStatus.UNAUTHORIZED, "Authentication failed", request);
+  }
+
+  @ExceptionHandler(AccessDeniedException.class)
+  public ResponseEntity<ApiError> handleAccessDeniedException(AccessDeniedException e, HttpServletRequest request) {
+    return buildResponse(HttpStatus.FORBIDDEN, "Access denied", request);
+  }
+
   @ExceptionHandler(Exception.class)
   public ResponseEntity<ApiError> handleException(Exception e, HttpServletRequest request) {
     if (e instanceof ErrorResponse springError) {
@@ -97,9 +117,7 @@ public class GlobalExceptionHandler {
     return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected error", request);
   }
 
-
-
-  private String userServiceMessage(RestClientResponseException e) {
+  private String userServiceMessage(WebClientResponseException e) {
     try {
       ApiError body = e.getResponseBodyAs(ApiError.class);
       if (body != null && body.message() != null) {
