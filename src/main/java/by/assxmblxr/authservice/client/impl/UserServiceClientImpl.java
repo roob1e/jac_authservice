@@ -7,17 +7,19 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.time.LocalDate;
+
 @Component
 @RequiredArgsConstructor
 public class UserServiceClientImpl implements UserServiceClient {
   private final WebClient userServiceWebClient;
 
   @Override
-  public Long createUser(String firstName, String lastName, String email) {
+  public Long createUser(String name, String surname, String email, LocalDate birthDate) {
     CreateUserResponse response = userServiceWebClient
             .post()
             .uri("/api/users")
-            .bodyValue(new CreateUserRequest(firstName, lastName, email))
+            .bodyValue(new CreateUserRequest(name, surname, email, birthDate))
             .retrieve()
             .bodyToMono(CreateUserResponse.class)
             .block();

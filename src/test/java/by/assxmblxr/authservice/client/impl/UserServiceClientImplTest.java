@@ -2,8 +2,11 @@ package by.assxmblxr.authservice.client.impl;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import by.assxmblxr.authservice.configuration.WebClientConfig;
+import by.assxmblxr.authservice.service.TokenService;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
@@ -18,12 +21,14 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.util.concurrent.atomic.AtomicReference;
 
 class UserServiceClientImplTest {
   private HttpServer server;
   private UserServiceClientImpl client;
   private final AtomicReference<String> lastRequest = new AtomicReference<>();
+  private final AtomicReference<String> lastAuthorization = new AtomicReference<>();
 
   @BeforeEach
   void setUp() throws IOException {
@@ -41,19 +46,21 @@ class UserServiceClientImplTest {
   void createUserPostsProfileAndReturnsGeneratedId() {
     respond("/api/users", 201, "{\"id\": 42, \"email\": \"ivan@mail.com\", \"active\": true}");
 
-    Long id = client.createUser("Ivan", "Petrov", "ivan@mail.com");
+    Long id = client.createUser("Ivan", "Petrov", "ivan@mail.com", LocalDate.of(1990, 5, 15));
 
     assertThat(id).isEqualTo(42L);
+    assertThat(lastAuthorization.get()).isEqualTo("Bearer service-token");
     assertThat(lastRequest.get())
             .startsWith("POST /api/users ")
-            .contains("\"firstName\":\"Ivan\"", "\"lastName\":\"Petrov\"", "\"email\":\"ivan@mail.com\"");
+            .contains("\"name\":\"Ivan\"", "\"surname\":\"Petrov\"", "\"email\":\"ivan@mail.com\"",
+                    "\"birthDate\":\"1990-05-15\"");
   }
 
   @Test
   void createUserFailsWhenResponseHasNoId() {
     respond("/api/users", 201, "{}");
 
-    assertThatThrownBy(() -> client.createUser("Ivan", "Petrov", "ivan@mail.com"))
+    assertThatThrownBy(() -> client.createUser("Ivan", "Petrov", "ivan@mail.com", LocalDate.of(1990, 5, 15)))
             .isInstanceOf(IllegalStateException.class)
             .hasMessage("UserService returned no user id");
   }
@@ -62,7 +69,7 @@ class UserServiceClientImplTest {
   void createUserPropagatesUserServiceClientError() {
     respond("/api/users", 409, "{\"status\": 409, \"message\": \"Email \\\"ivan@mail.com\\\" already exists\"}");
 
-    assertThatThrownBy(() -> client.createUser("Ivan", "Petrov", "ivan@mail.com"))
+    assertThatThrownBy(() -> client.createUser("Ivan", "Petrov", "ivan@mail.com", LocalDate.of(1990, 5, 15)))
             .isInstanceOfSatisfying(WebClientResponseException.class,
                     e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
   }
@@ -74,6 +81,7 @@ class UserServiceClientImplTest {
     client.deleteUser(42L);
 
     assertThat(lastRequest.get()).startsWith("DELETE /api/users/42 ");
+    assertThat(lastAuthorization.get()).isEqualTo("Bearer service-token");
   }
 
   @Test
@@ -84,14 +92,17 @@ class UserServiceClientImplTest {
   }
 
   private UserServiceClientImpl clientFor(String baseUrl) {
+    TokenService tokenService = mock(TokenService.class);
+    when(tokenService.generateServiceToken()).thenReturn("service-token");
     WebClient webClient = new WebClientConfig()
-            .userServiceWebClient(WebClient.builder(), baseUrl, Duration.ofSeconds(2));
+            .userServiceWebClient(WebClient.builder(), baseUrl, Duration.ofSeconds(2), tokenService);
     return new UserServiceClientImpl(webClient);
   }
 
   private void respond(String path, int status, String json) {
     server.createContext(path, exchange -> {
       lastRequest.set(exchange.getRequestMethod() + " " + exchange.getRequestURI() + " " + body(exchange));
+      lastAuthorization.set(exchange.getRequestHeaders().getFirst("Authorization"));
       if (json == null) {
         exchange.sendResponseHeaders(status, -1);
       } else {

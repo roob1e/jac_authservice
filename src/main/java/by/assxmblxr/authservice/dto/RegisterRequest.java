@@ -2,9 +2,13 @@ package by.assxmblxr.authservice.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Past;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Builder;
+
+import java.time.LocalDate;
 
 @Builder
 public record RegisterRequest(
@@ -28,10 +32,14 @@ public record RegisterRequest(
 
         @NotBlank
         @Size(max = 100)
-        String firstName,
+        String name,
 
         @NotBlank
         @Size(max = 100)
-        String lastName
+        String surname,
+
+        @NotNull
+        @Past
+        LocalDate birthDate
 ) {
 }

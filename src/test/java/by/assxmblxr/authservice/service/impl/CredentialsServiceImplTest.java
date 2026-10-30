@@ -41,6 +41,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Optional;
 
 @ExtendWith(MockitoExtension.class)
@@ -49,6 +50,7 @@ class CredentialsServiceImplTest {
   private static final String USERNAME = "ivan_petrov";
   private static final String PASSWORD = "Secret123!";
   private static final String HASH = "$2a$10$hash";
+  private static final LocalDate BIRTH_DATE = LocalDate.of(1990, 5, 15);
 
   @Mock
   private CredentialsRepository credentialsRepository;
@@ -74,7 +76,7 @@ class CredentialsServiceImplTest {
   @Test
   void registerCreatesUserProfileAndSavesHashedCredentialsWithUserRole() {
     when(credentialsRepository.existsByUsername(USERNAME)).thenReturn(false);
-    when(userServiceClient.createUser("Ivan", "Petrov", "ivan@mail.com")).thenReturn(USER_ID);
+    when(userServiceClient.createUser("Ivan", "Petrov", "ivan@mail.com", BIRTH_DATE)).thenReturn(USER_ID);
     when(passwordEncoder.encode(PASSWORD)).thenReturn(HASH);
     when(credentialsPersistenceService.save(any())).thenAnswer(invocation -> {
       Credentials saved = invocation.getArgument(0);
@@ -93,6 +95,8 @@ class CredentialsServiceImplTest {
     assertThat(saved.getRole()).isEqualTo(Role.USER);
     assertThat(saved.isActive()).isTrue();
     assertThat(response).isEqualTo(new RegisterResponse(1L, USER_ID, USERNAME, Role.USER));
+    verify(credentialsMapper).toEntity(registerRequest());
+    verify(credentialsMapper).toRegisterResponse(saved);
     verify(userServiceClient, never()).deleteUser(anyLong());
   }
 
@@ -103,14 +107,14 @@ class CredentialsServiceImplTest {
     RegisterRequest request = registerRequest();
     assertThatThrownBy(() -> credentialsService.register(request))
             .isInstanceOf(UsernameAlreadyExistsException.class);
-    verify(userServiceClient, never()).createUser(anyString(), anyString(), anyString());
+    verify(userServiceClient, never()).createUser(anyString(), anyString(), anyString(), any(LocalDate.class));
     verify(credentialsPersistenceService, never()).save(any());
   }
 
   @Test
   void registerDoesNotSaveCredentialsWhenUserServiceFails() {
     when(credentialsRepository.existsByUsername(USERNAME)).thenReturn(false);
-    when(userServiceClient.createUser(anyString(), anyString(), anyString()))
+    when(userServiceClient.createUser(anyString(), anyString(), anyString(), any(LocalDate.class)))
             .thenThrow(new IllegalStateException("UserService returned no user id"));
 
     RegisterRequest request = registerRequest();
@@ -124,7 +128,7 @@ class CredentialsServiceImplTest {
   void registerDeletesCreatedUserProfileWhenSavingCredentialsFails() {
     DataIntegrityViolationException saveError = new DataIntegrityViolationException("duplicate user_id");
     when(credentialsRepository.existsByUsername(USERNAME)).thenReturn(false);
-    when(userServiceClient.createUser(anyString(), anyString(), anyString())).thenReturn(USER_ID);
+    when(userServiceClient.createUser(anyString(), anyString(), anyString(), any(LocalDate.class))).thenReturn(USER_ID);
     when(passwordEncoder.encode(PASSWORD)).thenReturn(HASH);
     when(credentialsPersistenceService.save(any())).thenThrow(saveError);
 
@@ -138,7 +142,7 @@ class CredentialsServiceImplTest {
     DataIntegrityViolationException saveError = new DataIntegrityViolationException("duplicate user_id");
     IllegalStateException deleteError = new IllegalStateException("UserService is down");
     when(credentialsRepository.existsByUsername(USERNAME)).thenReturn(false);
-    when(userServiceClient.createUser(anyString(), anyString(), anyString())).thenReturn(USER_ID);
+    when(userServiceClient.createUser(anyString(), anyString(), anyString(), any(LocalDate.class))).thenReturn(USER_ID);
     when(passwordEncoder.encode(PASSWORD)).thenReturn(HASH);
     when(credentialsPersistenceService.save(any())).thenThrow(saveError);
     doThrow(deleteError).when(userServiceClient).deleteUser(USER_ID);
@@ -249,7 +253,7 @@ class CredentialsServiceImplTest {
   }
 
   private RegisterRequest registerRequest() {
-    return new RegisterRequest(USERNAME, "ivan@mail.com", PASSWORD, "Ivan", "Petrov");
+    return new RegisterRequest(USERNAME, "ivan@mail.com", PASSWORD, "Ivan", "Petrov", BIRTH_DATE);
   }
 
   private Credentials credentials(boolean active) {

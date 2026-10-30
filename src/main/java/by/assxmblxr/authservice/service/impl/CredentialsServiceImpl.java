@@ -33,7 +33,7 @@ public class CredentialsServiceImpl implements CredentialsService {
     if (credentialsRepository.existsByUsername(request.username())) {
       throw new UsernameAlreadyExistsException("Username \"" + request.username() + "\" already exists");
     }
-    Long userId = userServiceClient.createUser(request.firstName(), request.lastName(), request.email());
+    Long userId = userServiceClient.createUser(request.name(), request.surname(), request.email(), request.birthDate());
     Credentials credentials = credentialsMapper.toEntity(request);
     credentials.setUserId(userId);
     credentials.setPasswordHash(passwordEncoder.encode(request.password()));

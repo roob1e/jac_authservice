@@ -1,8 +1,11 @@
 package by.assxmblxr.authservice.client.dto;
 
+import java.time.LocalDate;
+
 public record CreateUserRequest(
-        String firstName,
-        String lastName,
-        String email
+        String name,
+        String surname,
+        String email,
+        LocalDate birthDate
 ) {
 }

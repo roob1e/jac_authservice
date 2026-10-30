@@ -1,6 +1,7 @@
 package by.assxmblxr.authservice.service.impl;
 
 import by.assxmblxr.authservice.entity.Credentials;
+import by.assxmblxr.authservice.entity.Role;
 import by.assxmblxr.authservice.exception.InvalidTokenException;
 import by.assxmblxr.authservice.service.TokenService;
 import org.springframework.beans.factory.annotation.Value;
@@ -13,6 +14,9 @@ import java.time.Instant;
 
 @Service
 public class TokenServiceImpl implements TokenService {
+  public static final String SERVICE_SUBJECT = "auth-service";
+  private static final Duration SERVICE_TOKEN_TTL = Duration.ofMinutes(1);
+
   private final Duration accessTtl;
   private final Duration refreshTtl;
   private final JwtEncoder jwtEncoder;
@@ -54,6 +58,22 @@ public class TokenServiceImpl implements TokenService {
             .expiresAt(now.plus(refreshTtl))
             .claim("userId", credentials.getUserId())
             .claim("type", "refresh")
+            .build();
+
+    JwsHeader header = JwsHeader.with(SignatureAlgorithm.RS256).build();
+
+    return jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
+  }
+
+  @Override
+  public String generateServiceToken() {
+    Instant now = Instant.now();
+    JwtClaimsSet claims = JwtClaimsSet.builder()
+            .subject(SERVICE_SUBJECT)
+            .issuedAt(now)
+            .expiresAt(now.plus(SERVICE_TOKEN_TTL))
+            .claim("role", Role.ADMIN.name())
+            .claim("type", "service")
             .build();
 
     JwsHeader header = JwsHeader.with(SignatureAlgorithm.RS256).build();

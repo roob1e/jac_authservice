@@ -1,5 +1,6 @@
 package by.assxmblxr.authservice.service.impl;
 
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -32,7 +33,7 @@ class TokenServiceImplTest {
   @BeforeEach
   void setUp() throws Exception {
     rsaKey = jwtConfig.rsaKey();
-    tokenService = tokenService(ACCESS_TTL, rsaKey);
+    tokenService = tokenService(rsaKey);
   }
 
   @Test
@@ -48,7 +49,7 @@ class TokenServiceImplTest {
     assertThat(jwt.getClaimAsString("role")).isEqualTo("USER");
     assertThat(jwt.getClaimAsString("type")).isEqualTo("access");
     assertThat(jwt.getIssuedAt()).isAfter(before);
-    assertThat(Duration.between(jwt.getIssuedAt(), jwt.getExpiresAt())).isEqualTo(ACCESS_TTL);
+    assertThat(Duration.between(requireNonNull(jwt.getIssuedAt()), jwt.getExpiresAt())).isEqualTo(ACCESS_TTL);
   }
 
   @Test
@@ -61,7 +62,29 @@ class TokenServiceImplTest {
     assertThat(jwt.<Long>getClaim("userId")).isEqualTo(42L);
     assertThat(jwt.getClaimAsString("type")).isEqualTo("refresh");
     assertThat(jwt.hasClaim("role")).isFalse();
-    assertThat(Duration.between(jwt.getIssuedAt(), jwt.getExpiresAt())).isEqualTo(REFRESH_TTL);
+    assertThat(Duration.between(requireNonNull(jwt.getIssuedAt()), jwt.getExpiresAt())).isEqualTo(REFRESH_TTL);
+  }
+
+  @Test
+  void serviceTokenIsShortLivedAdminTokenOfAuthService() throws Exception {
+    String token = tokenService.generateServiceToken();
+
+    Jwt jwt = publicKeyDecoder(rsaKey).decode(token);
+    assertThat(jwt.getHeaders()).containsEntry("alg", "RS256");
+    assertThat(jwt.getSubject()).isEqualTo("auth-service");
+    assertThat(jwt.getClaimAsString("role")).isEqualTo("ADMIN");
+    assertThat(jwt.getClaimAsString("type")).isEqualTo("service");
+    assertThat(jwt.hasClaim("userId")).isFalse();
+    assertThat(Duration.between(requireNonNull(jwt.getIssuedAt()), jwt.getExpiresAt())).isEqualTo(Duration.ofMinutes(1));
+  }
+
+  @Test
+  void serviceTokenIsNotAcceptedAsUserAccessToken() {
+    String token = tokenService.generateServiceToken();
+
+    assertThatThrownBy(() -> tokenService.parse(token, "access"))
+            .isInstanceOf(InvalidTokenException.class)
+            .hasMessage("Token type mismatch");
   }
 
   @Test
@@ -94,7 +117,7 @@ class TokenServiceImplTest {
 
   @Test
   void parseRejectsTokenSignedWithAnotherKey() throws Exception {
-    TokenServiceImpl foreignIssuer = tokenService(ACCESS_TTL, jwtConfig.rsaKey());
+    TokenServiceImpl foreignIssuer = tokenService(jwtConfig.rsaKey());
     String foreignToken = foreignIssuer.generateAccessToken(credentials());
 
     assertThatThrownBy(() -> tokenService.parse(foreignToken, "access"))
@@ -103,7 +126,7 @@ class TokenServiceImplTest {
   }
 
   @Test
-  void parseRejectsExpiredToken() throws Exception {
+  void parseRejectsExpiredToken() {
     Instant issuedAt = Instant.now().minus(Duration.ofMinutes(10));
     JwtClaimsSet claims = JwtClaimsSet.builder()
             .subject("ivan_petrov")
@@ -126,8 +149,8 @@ class TokenServiceImplTest {
             .isInstanceOf(InvalidTokenException.class);
   }
 
-  private TokenServiceImpl tokenService(Duration accessTtl, RSAKey key) throws Exception {
-    return new TokenServiceImpl(accessTtl, REFRESH_TTL, jwtConfig.jwtEncoder(key), jwtConfig.jwtDecoder(rsaKey));
+  private TokenServiceImpl tokenService(RSAKey key) throws Exception {
+    return new TokenServiceImpl(ACCESS_TTL, REFRESH_TTL, jwtConfig.jwtEncoder(key), jwtConfig.jwtDecoder(rsaKey));
   }
 
   private JwtDecoder publicKeyDecoder(RSAKey key) throws Exception {

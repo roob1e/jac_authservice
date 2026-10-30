@@ -3,6 +3,7 @@ package by.assxmblxr.authservice;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -26,6 +27,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.LocalDate;
 import java.util.Map;
 
 @SpringBootTest
@@ -33,6 +35,7 @@ import java.util.Map;
 @Import(TestcontainersConfiguration.class)
 class AuthApiIntegrationTest {
   private static final String PASSWORD = "Secret123!";
+  private static final LocalDate BIRTH_DATE = LocalDate.of(1990, 5, 15);
 
   @Autowired
   private MockMvc mockMvc;
@@ -50,7 +53,7 @@ class AuthApiIntegrationTest {
 
   @Test
   void registeredUserIsStoredWithHashedPasswordAndAuditTimestamps() throws Exception {
-    when(userServiceClient.createUser("Ivan", "Petrov", "ivan@mail.com")).thenReturn(42L);
+    when(userServiceClient.createUser("Ivan", "Petrov", "ivan@mail.com", BIRTH_DATE)).thenReturn(42L);
 
     mockMvc.perform(post("/api/auth/register")
                     .contentType(APPLICATION_JSON)
@@ -70,7 +73,7 @@ class AuthApiIntegrationTest {
 
   @Test
   void samePasswordGetsDifferentHashesBecauseOfUniqueSalt() throws Exception {
-    when(userServiceClient.createUser(anyString(), anyString(), anyString())).thenReturn(1L, 2L);
+    when(userServiceClient.createUser(anyString(), anyString(), anyString(), any(LocalDate.class))).thenReturn(1L, 2L);
     register("ivan_petrov", "ivan@mail.com");
     register("anna_smirnova", "anna@mail.com");
 
@@ -81,7 +84,7 @@ class AuthApiIntegrationTest {
 
   @Test
   void registerRejectsTakenUsernameWithoutCallingUserService() throws Exception {
-    when(userServiceClient.createUser(anyString(), anyString(), anyString())).thenReturn(1L);
+    when(userServiceClient.createUser(anyString(), anyString(), anyString(), any(LocalDate.class))).thenReturn(1L);
     register("ivan_petrov", "ivan@mail.com");
 
     mockMvc.perform(post("/api/auth/register")
@@ -90,12 +93,12 @@ class AuthApiIntegrationTest {
             .andExpect(status().isConflict())
             .andExpect(jsonPath("$.status").value(409));
 
-    verify(userServiceClient, never()).createUser("Ivan", "Petrov", "other@mail.com");
+    verify(userServiceClient, never()).createUser("Ivan", "Petrov", "other@mail.com", BIRTH_DATE);
   }
 
   @Test
   void registerRollsBackUserProfileWhenCredentialsCannotBeSaved() throws Exception {
-    when(userServiceClient.createUser(anyString(), anyString(), anyString())).thenReturn(7L);
+    when(userServiceClient.createUser(anyString(), anyString(), anyString(), any(LocalDate.class))).thenReturn(7L);
     register("ivan_petrov", "ivan@mail.com");
 
     mockMvc.perform(post("/api/auth/register")
@@ -113,19 +116,19 @@ class AuthApiIntegrationTest {
                     .contentType(APPLICATION_JSON)
                     .content("""
                             {"username": "iv", "password": "short", "email": "not-an-email",
-                             "firstName": "", "lastName": "Petrov"}
+                             "name": "", "surname": "Petrov"}
                             """))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.message").value(containsString("username")))
             .andExpect(jsonPath("$.message").value(containsString("password")))
             .andExpect(jsonPath("$.message").value(containsString("email")));
 
-    verify(userServiceClient, never()).createUser(anyString(), anyString(), anyString());
+    verify(userServiceClient, never()).createUser(anyString(), anyString(), anyString(), any(LocalDate.class));
   }
 
   @Test
   void loginRefreshAndValidateWorkTogether() throws Exception {
-    when(userServiceClient.createUser(anyString(), anyString(), anyString())).thenReturn(42L);
+    when(userServiceClient.createUser(anyString(), anyString(), anyString(), any(LocalDate.class))).thenReturn(42L);
     register("ivan_petrov", "ivan@mail.com");
 
     String tokens = mockMvc.perform(post("/api/auth/login")
@@ -160,7 +163,7 @@ class AuthApiIntegrationTest {
 
   @Test
   void loginRejectsWrongPasswordAndUnknownUserTheSameWay() throws Exception {
-    when(userServiceClient.createUser(anyString(), anyString(), anyString())).thenReturn(42L);
+    when(userServiceClient.createUser(anyString(), anyString(), anyString(), any(LocalDate.class))).thenReturn(42L);
     register("ivan_petrov", "ivan@mail.com");
 
     mockMvc.perform(post("/api/auth/login")
@@ -178,7 +181,7 @@ class AuthApiIntegrationTest {
 
   @Test
   void disabledAccountCannotLogIn() throws Exception {
-    when(userServiceClient.createUser(anyString(), anyString(), anyString())).thenReturn(42L);
+    when(userServiceClient.createUser(anyString(), anyString(), anyString(), any(LocalDate.class))).thenReturn(42L);
     register("ivan_petrov", "ivan@mail.com");
     jdbcTemplate.update("UPDATE credentials SET active = false WHERE username = 'ivan_petrov'");
 
@@ -226,7 +229,7 @@ class AuthApiIntegrationTest {
 
   private String registerJson(String username, String email) {
     return """
-            {"username": "%s", "password": "%s", "email": "%s", "firstName": "Ivan", "lastName": "Petrov"}
+            {"username": "%s", "password": "%s", "email": "%s", "name": "Ivan", "surname": "Petrov", "birthDate": "1990-05-15"}
             """.formatted(username, PASSWORD, email);
   }
 
