@@ -62,9 +62,8 @@ class AuthApiIntegrationTest {
             .andExpect(jsonPath("$.passwordHash").doesNotExist());
 
     Map<String, Object> row = jdbcTemplate.queryForMap("SELECT * FROM credentials WHERE username = 'ivan_petrov'");
-    assertThat(row.get("user_id")).isEqualTo(42L);
+    assertThat(row).containsEntry("user_id", 42L).containsEntry("role", "USER");
     assertThat((String) row.get("password_hash")).startsWith("$2a$").isNotEqualTo(PASSWORD);
-    assertThat(row.get("role")).isEqualTo("USER");
     assertThat(row.get("created_at")).isNotNull();
     assertThat(row.get("updated_at")).isNotNull();
   }

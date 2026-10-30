@@ -100,7 +100,8 @@ class CredentialsServiceImplTest {
   void registerThrowsWhenUsernameTakenWithoutCallingUserService() {
     when(credentialsRepository.existsByUsername(USERNAME)).thenReturn(true);
 
-    assertThatThrownBy(() -> credentialsService.register(registerRequest()))
+    RegisterRequest request = registerRequest();
+    assertThatThrownBy(() -> credentialsService.register(request))
             .isInstanceOf(UsernameAlreadyExistsException.class);
     verify(userServiceClient, never()).createUser(anyString(), anyString(), anyString());
     verify(credentialsPersistenceService, never()).save(any());
@@ -112,7 +113,8 @@ class CredentialsServiceImplTest {
     when(userServiceClient.createUser(anyString(), anyString(), anyString()))
             .thenThrow(new IllegalStateException("UserService returned no user id"));
 
-    assertThatThrownBy(() -> credentialsService.register(registerRequest()))
+    RegisterRequest request = registerRequest();
+    assertThatThrownBy(() -> credentialsService.register(request))
             .isInstanceOf(IllegalStateException.class);
     verify(credentialsPersistenceService, never()).save(any());
     verify(userServiceClient, never()).deleteUser(anyLong());
@@ -126,7 +128,8 @@ class CredentialsServiceImplTest {
     when(passwordEncoder.encode(PASSWORD)).thenReturn(HASH);
     when(credentialsPersistenceService.save(any())).thenThrow(saveError);
 
-    assertThatThrownBy(() -> credentialsService.register(registerRequest())).isSameAs(saveError);
+    RegisterRequest request = registerRequest();
+    assertThatThrownBy(() -> credentialsService.register(request)).isSameAs(saveError);
     verify(userServiceClient).deleteUser(USER_ID);
   }
 
@@ -140,7 +143,8 @@ class CredentialsServiceImplTest {
     when(credentialsPersistenceService.save(any())).thenThrow(saveError);
     doThrow(deleteError).when(userServiceClient).deleteUser(USER_ID);
 
-    assertThatThrownBy(() -> credentialsService.register(registerRequest()))
+    RegisterRequest request = registerRequest();
+    assertThatThrownBy(() -> credentialsService.register(request))
             .isSameAs(saveError)
             .satisfies(e -> assertThat(e.getSuppressed()).containsExactly(deleteError));
   }
@@ -162,7 +166,8 @@ class CredentialsServiceImplTest {
   void loginRejectsUnknownUsername() {
     when(credentialsRepository.findByUsername(USERNAME)).thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> credentialsService.login(new LoginRequest(USERNAME, PASSWORD)))
+    LoginRequest request = new LoginRequest(USERNAME, PASSWORD);
+    assertThatThrownBy(() -> credentialsService.login(request))
             .isInstanceOf(InvalidCredentialsException.class)
             .hasMessage("Invalid username or password");
   }
@@ -172,7 +177,8 @@ class CredentialsServiceImplTest {
     when(credentialsRepository.findByUsername(USERNAME)).thenReturn(Optional.of(credentials(true)));
     when(passwordEncoder.matches("WrongPass1", HASH)).thenReturn(false);
 
-    assertThatThrownBy(() -> credentialsService.login(new LoginRequest(USERNAME, "WrongPass1")))
+    LoginRequest request = new LoginRequest(USERNAME, "WrongPass1");
+    assertThatThrownBy(() -> credentialsService.login(request))
             .isInstanceOf(InvalidCredentialsException.class)
             .hasMessage("Invalid username or password");
     verify(tokenService, never()).generateAccessToken(any());
@@ -183,7 +189,8 @@ class CredentialsServiceImplTest {
     when(credentialsRepository.findByUsername(USERNAME)).thenReturn(Optional.of(credentials(false)));
     when(passwordEncoder.matches(PASSWORD, HASH)).thenReturn(true);
 
-    assertThatThrownBy(() -> credentialsService.login(new LoginRequest(USERNAME, PASSWORD)))
+    LoginRequest request = new LoginRequest(USERNAME, PASSWORD);
+    assertThatThrownBy(() -> credentialsService.login(request))
             .isInstanceOf(AccountDisabledException.class);
     verify(tokenService, never()).generateAccessToken(any());
   }
@@ -206,7 +213,8 @@ class CredentialsServiceImplTest {
     when(tokenService.parse("refresh-token", "refresh")).thenReturn(jwt("refresh"));
     when(credentialsRepository.findByUsername(USERNAME)).thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> credentialsService.refresh(new RefreshRequest("refresh-token")))
+    RefreshRequest request = new RefreshRequest("refresh-token");
+    assertThatThrownBy(() -> credentialsService.refresh(request))
             .isInstanceOf(InvalidTokenException.class);
   }
 
@@ -215,7 +223,8 @@ class CredentialsServiceImplTest {
     when(tokenService.parse("refresh-token", "refresh")).thenReturn(jwt("refresh"));
     when(credentialsRepository.findByUsername(USERNAME)).thenReturn(Optional.of(credentials(false)));
 
-    assertThatThrownBy(() -> credentialsService.refresh(new RefreshRequest("refresh-token")))
+    RefreshRequest request = new RefreshRequest("refresh-token");
+    assertThatThrownBy(() -> credentialsService.refresh(request))
             .isInstanceOf(AccountDisabledException.class);
     verify(tokenService, never()).generateAccessToken(any());
   }
@@ -224,7 +233,8 @@ class CredentialsServiceImplTest {
   void refreshPropagatesInvalidTokenFromParser() {
     when(tokenService.parse("bad", "refresh")).thenThrow(new InvalidTokenException("Invalid token"));
 
-    assertThatThrownBy(() -> credentialsService.refresh(new RefreshRequest("bad")))
+    RefreshRequest request = new RefreshRequest("bad");
+    assertThatThrownBy(() -> credentialsService.refresh(request))
             .isInstanceOf(InvalidTokenException.class);
     verify(credentialsRepository, never()).findByUsername(anyString());
   }

@@ -123,7 +123,9 @@ public class GlobalExceptionHandler {
       if (body != null && body.message() != null) {
         return body.message();
       }
-    } catch (RuntimeException ignored) {}
+    } catch (RuntimeException parseError) {
+      log.debug("UserService error body is not an ApiError: {}", e.getResponseBodyAsString(), parseError);
+    }
     return "User service rejected the request";
   }
 
