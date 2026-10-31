@@ -1,0 +1,40 @@
+databaseChangeLog:
+  - changeSet:
+      id: 002-rename-login-to-username
+      author: assxmblxr
+      changes:
+        - renameColumn:
+            tableName: credentials
+            oldColumnName: login
+            newColumnName: username
+            columnDataType: VARCHAR(100)
+        - sql:
+            sql: ALTER TABLE credentials RENAME CONSTRAINT uq_credentials_login TO uq_credentials_username
+      rollback:
+        - sql:
+            sql: ALTER TABLE credentials RENAME CONSTRAINT uq_credentials_username TO uq_credentials_login
+        - renameColumn:
+            tableName: credentials
+            oldColumnName: username
+            newColumnName: login
+            columnDataType: VARCHAR(100)
+
+  - changeSet:
+      id: 002-add-audit-columns
+      author: assxmblxr
+      changes:
+        - addColumn:
+            tableName: credentials
+            columns:
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false

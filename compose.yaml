@@ -1,9 +1,34 @@
 services:
   postgres:
-    image: 'postgres:latest'
+    image: 'postgres:17'
     environment:
-      - 'POSTGRES_DB=mydatabase'
+      - 'POSTGRES_DB=authservicedb'
+      - 'POSTGRES_USER=user'
       - 'POSTGRES_PASSWORD=secret'
-      - 'POSTGRES_USER=myuser'
     ports:
       - '5432'
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "user", "-d", "authservicedb"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  auth-service:
+    build: .
+    profiles: ["app"]
+    ports: ["8082:8082"]
+    environment:
+      - 'SPRING_PROFILES_ACTIVE=docker'
+      - 'DB_URL=jdbc:postgresql://postgres:5432/authservicedb'
+      - 'DB_USER=user'
+      - 'DB_PASSWORD=secret'
+      - 'USER_SERVICE_URL=http://user-service:8081'
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - default
+      - microservices
+networks:
+  microservices:
+    external: true

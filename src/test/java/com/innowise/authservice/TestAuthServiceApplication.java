@@ -1,4 +1,4 @@
-package by.assxmblxr.authservice;
+package com.innowise.authservice;
 
 import org.springframework.boot.SpringApplication;
 
